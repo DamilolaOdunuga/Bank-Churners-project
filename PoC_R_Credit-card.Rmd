@@ -1,0 +1,253 @@
+---
+date: "2023-03-03"
+output: html_document
+---
+
+<CENTER>
+<FONT SIZE = 4, COLOR = "#11529">
+<BR>PREDICTING CREDIT CARD CHURNERS USING MACHINE LEARNING</FONT>
+<BR>Damilola Odunuga</B>
+<BR> March 8th, 2023
+</CENTER>
+
+</CENTER>
+<BR><strong>INTRODUCTION</strong>
+<BR>According to U.S.News (March, 2022), Credit card companies frequently advertise substantial welcome incentives in order to entice new clients. These welcome incentives can quickly earn a large number of miles, points, or cash back. Credit card churning is the practice of applying for cards with the purpose of canceling, downgrading, or "sock-drawering" the card after the spending requirements have been completed. Most credit cards demand you to spend a certain amount in a short period of time in order to qualify for these incentives.</B>
+
+<BR>BENEFIT OF CREDIT CARD CHURNING</B>
+<BR>The benefits of credit card churning include welcome bonuses which customers enjoy, co-branded benefits from partners like airlines, exclusive benefit from hotel bookings, 0% APR intro offer usually between 12 to 21 months and waived annual fees offered by most credit card companies as an incentives.</B>
+
+<BR>DISADVANTANGES OF CREDIT CARD CHURNING</B>
+<BR>Some disadvantages of credit card churning include overspending, high annual fees, keeping track of cards, harm to bank relationship, not earning the welcome bonus as a result of not spending the required amount.
+<BR>Another disadvantages or effect of credit card churning include payment history, utilization ratio, average age of credit, mix of credit, new credits. Banks can limit credit card churning through numerous ways. However, for this analysis, we would employ the use of machine learning to predict customers who are likely to churn their credit cards, using the bank credit card dataset available in Kaggle.</B>
+
+<BR>To complete this analysis, the first step is to perform exploratory data analysis, data cleaning on the data set of use, then the data will be split into 75% training and 25% test set, after which machine learning will be used to predict the customers credit card churners.
+
+```{r include=FALSE}
+library(readr)
+library(vroom)
+
+credit = read_csv("~/BankChurners.csv")
+```
+
+<BR><strong>EXPLORATORY DATA ANALYSIS</strong></B>
+<BR>Some of the main factors to consider for customer churning are customer age and credit limit, this summary generated interquartile range of the two variables which include mean and median.</B>
+
+```{r echo=FALSE}
+# Interquartile range of some selected variables
+summary(credit$Customer_Age)
+summary(credit$Credit_Limit)
+```
+```{r echo=FALSE, fig.height=4}
+# Bar plot
+library(ggplot2)
+library(scales)
+ggplot(credit, aes(x=Marital_Status, y=Credit_Limit)) +
+  geom_bar(stat="identity") +
+  scale_y_continuous(labels = comma) +
+  ggtitle("Bar Chart of Marital status vs Credit limit")
+```
+```{r echo=FALSE}
+# Histogram
+ggplot(credit, aes(x = Customer_Age)) +
+  geom_histogram(color = 'turquoise4', bins = 10, fill = 'turquoise') +
+  ggtitle("Plot of Customer Age")
+```
+```{r echo=FALSE}
+# Box plot
+boxplot(Dependent_count ~ Education_Level, data = credit, col=c("purple"),
+        main = "Box plot of Educational Level vs Dependent",
+        xlab="Category of educational level", ylab="Count of Dependent")
+```
+
+```{r echo=FALSE}
+# Create scatter plot
+ggplot(data=credit, aes(Months_on_book, Customer_Age, colour=Dependent_count)) +
+  geom_point(size=2) + ggtitle("Count of Month as customer vs Age of Customer") + 
+  xlab("Count of month") +
+  ylab("Customer Age") +
+  geom_smooth(method = "lm")
+```
+```{r echo=FALSE, include=FALSE}
+# Create new dataframe from credit dataframe for correlation matrix
+library(corrplot)
+corr_credit = data.frame(credit$Customer_Age, credit$Dependent_count, credit$Months_on_book, credit$Total_Relationship_Count, credit$Months_Inactive_12_mon, credit$Contacts_Count_12_mon, credit$Credit_Limit, credit$Total_Revolving_Bal, credit$Avg_Open_To_Buy, credit$Total_Amt_Chng_Q4_Q1, credit$Total_Trans_Amt, credit$Total_Trans_Ct, credit$Total_Ct_Chng_Q4_Q1, credit$Avg_Utilization_Ratio)
+```
+
+
+```{r echo=FALSE}
+# Correlation Matrix
+corr = round(cor(corr_credit), 1)
+corrplot::corrplot(cor(corr), tl.cex = 0.5, addCoef.col=1, number.cex=0.4, method="square", title="Correlation plot of numeric variables", mar=c(0,0,3,0), tl.srt = 45)
+```
+
+<BR><strong>DATA CLEANING</strong></FONT>
+<BR> Missing or incorrect values in the dataset will change the outcome and might have an impact on the business decision. To prevent losses, difficulties and additional costs brought on by inaccurate data, the data must be correct. To accurately predict customer churning, the data will be cleaned by removing missing values, incorrect columns or rows, and columns which will not used for the predictive modeling.</B>
+
+<BR>1.1. FINDING NA's AND DATA TYPE</B>
+<BR>The data set does not contain any missing value (code chuck and result excluded), however, from the above box plot, the data shows few outliers which will not be removed from this analysis. Additionally, data type for all columns has been generated.</B>
+```{r echo=FALSE, include=FALSE}
+# Finding missing value
+is.na(credit)
+```
+```{r echo=FALSE}
+# Data Type
+str(credit)
+```
+
+<BR>1.2. DATA TRANSFORMATION</B>
+<BR>Data transformation is required to change categorical variables using one-hot encoding or label encoding before performing the predictive modeling. Columns which will be change include: attrition flag, gender, education level, marital status, and income category.</B>
+
+```{r echo=FALSE}
+library(superml)
+# Data transformation: Attrition flag
+lab = LabelEncoder$new()
+lab$fit(credit$Attrition_Flag)
+credit$Attrition_Flag = lab$fit_transform(credit$Attrition_Flag)
+```
+```{r echo=FALSE}
+# Data transformation:education level
+lab$fit(credit$Education_Level)
+credit$Education_Level = lab$fit_transform(credit$Education_Level)
+
+# Data transformation: marital status
+lab$fit(credit$Marital_Status)
+credit$Marital_Status = lab$fit_transform(credit$Marital_Status)
+
+# Data transformation: income category
+lab$fit(credit$Income_Category)
+credit$Income_Category = lab$fit_transform(credit$Income_Category)
+```
+
+<BR>1.3. SUBSETTING DEPENDENT AND INDEPENDENT VARIABLES</B>
+<BR>Since this analysis is to predict churning customers, the dependent variable will be attrition flag while other variables will be independent variables. Additionally, factors such as client number and card category will be dropped for this analysis to be performed. Furthermore, the dataset will be split into 75%  training and 25% test set for the machine learning model.</B>
+
+```{r echo=FALSE}
+# Dropping columns
+credit_2 = credit[, !names(credit) %in% c("CLIENTNUM", "Card_Category", "Naive_Bayes_Classifier_Attrition_Flag_Card_Category_Contacts_Count_12_mon_Dependent_count_Education_Level_Months_Inactive_12_mon_1", "Naive_Bayes_Classifier_Attrition_Flag_Card_Category_Contacts_Count_12_mon_Dependent_count_Education_Level_Months_Inactive_12_mon_2")]
+```
+
+<BR><strong>RANDOM FOREST REGRESSION METHOD</strong></B>
+```{r echo=FALSE}
+# random forest model
+set.seed(123)
+library(randomForest)
+model_rf = randomForest(Attrition_Flag~., data=credit_2, mtry = 3, importance = TRUE, na.action = na.omit)
+```
+
+```{r echo=FALSE}
+# Print model result
+Model_rf_pred = predict(model_rf)
+print(model_rf)
+```
+
+```{r echo=FALSE}
+# Plot model error against number of random forest tree
+plot(model_rf, main="Random forest model trees vs Errors")
+```
+
+<BR>FEATURE IMPORTANCE</B>
+```{r echo=FALSE}
+#Finding important features based on mean
+importance(model_rf, conditional=TRUE)
+```
+<BR><strong>RANDOM FOREST CLASSIFICATION METHOD</strong></B>
+```{r echo=FALSE}
+# Change data type for classification
+credit_2$Attrition_Flag = as.factor(credit_2$Attrition_Flag)
+```
+
+```{r echo=FALSE}
+# Split train and test set
+set.seed(123)
+ind = sample(2, nrow(credit_2), replace=TRUE, prob=c(0.75, 0.25))
+train = credit_2[ind==1,]
+test = credit_2[ind==2,]
+```
+
+```{r echo=FALSE}
+# classification model
+class_rf = randomForest(Attrition_Flag~., data=train, proximity=TRUE, importance=TRUE)
+print(class_rf)
+```
+
+```{r echo=FALSE, include=FALSE}
+library(caret)
+library(varImp)
+```
+
+<BR>PREDICTING TRAIN SET AND CONFUSION MATRIX</B>
+```{r echo=FALSE}
+# Predicting for train and confusion matrix
+class_pred = predict(class_rf, train)
+confusionMatrix(class_pred, train$Attrition_Flag)
+```
+
+<BR>PREDICTING TEST SET AND CONFUSION MATRIX</B>
+```{r echo=FALSE}
+# Predicting for test and confusion matrix
+class_pred_test = predict(class_rf, test)
+confusionMatrix(class_pred_test, test$Attrition_Flag)
+```
+
+<BR>FEATURE IMPORTANCE</B>
+```{r echo=FALSE}
+# Plot important features
+important=importance(class_rf)
+par(mfrow=c(1,1))
+varImpPlot(class_rf)
+```
+
+<BR><strong>SVM CLASSIFICATION MODEL</strong></B>
+```{r echo=FALSE, include=FALSE}
+# Packages needed for support vector and color R colors
+library(kernlab)
+library(e1071)
+library(RColorBrewer)
+```
+
+```{r echo=FALSE}
+# Fitting SVM model
+model_svm = svm(Attrition_Flag~., data=train, kernel="linear", scale=FALSE)
+print(model_svm)
+```
+
+<BR>OPTIMAL COST OF CLASSIFICATION</B>
+```{r echo=FALSE, include=FALSE}
+# Finding optimal cost of classification
+tune_out = tune(svm, Attrition_Flag~., data=train, kernel="linear",
+                range=list(cost=c(0.001, 0.01, 0.1, 1, 5, 10, 100)))
+
+# Extract best model
+best_model = tune_out$best.model
+```
+
+```{r echo=FALSE}
+# Print best model
+print(best_model)
+```
+<BR>PREDICTING TRAIN USING THE BEST MODEL</B>
+```{r echo=FALSE}
+# predict train
+svm_pred = predict(best_model, train)
+confusionMatrix(svm_pred, train$Attrition_Flag)
+```
+<BR>PREDICTING TEST USING THE BEST MODEL</B>
+```{r echo=FALSE}
+# Predict test
+svm_pred_test = predict(best_model, test)
+confusionMatrix(svm_pred_test, test$Attrition_Flag)
+```
+
+<BR><strong>CONCLUSION AND INTERPRETATION</strong></BR>
+<BR>By the definition, credit card churning involves opening multiple accounts for the purpose of welcome bonuses and closing the accounts affect the sole purpose has been achieved. Based on this analysis, two predictive model random forest (both regression and classification model)and SVM was conducted with multiple metrics generated. Both random forest regression and classifier shows that the predictive model performed well in classifying the data and the regression analysis generated very low error.Additionally, the confusion matrix for both random forest models generated low false positive and false negative, with the classifier model accuracy of 0.96%.</B>
+<BR>After predicting the model, SVM generated model accuracy of 0.90%. In both models, we conclude that some attributes should be considered for churning customers, these factors include total transaction count and total number of products held by the customer that is, total number of credit card owned by the customer. Putting this into consideration, I think banks should not consider customers who have a lot of credit card, and those whose previous card barely has any transactions. Also, I believe that along with discouraging this among customers, banks can also include the implications of credit card churning in their terms and conditions which could help decrease the number of credit card churners.</B>
+
+
+
+
+
+
+
+
+
